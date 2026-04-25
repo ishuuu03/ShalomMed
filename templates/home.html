@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShalomMed</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+<style>
+:root {
+  --primary: #5B42F3;
+  --secondary: #00DDEB;
+  --accent: #AF40FF;
+  --bg: #f8f9ff;
+}
+
+/* GLOBAL */
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  text-align: center;
+}
+
+/* NAV */
+nav {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 10%;
+  background: white;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(144deg, var(--accent), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* HERO */
+.intro {
+  padding: 80px 20px 40px;
+}
+
+.intro h1 {
+  font-size: 3rem;
+}
+
+.intro p {
+  color: #666;
+}
+
+/* UPLOAD BOX */
+.upload-section {
+  background: white;
+  max-width: 600px;
+  margin: 30px auto;
+  padding: 40px;
+  border-radius: 24px;
+  border: 2px dashed #ddd;
+  transition: 0.3s;
+}
+
+.upload-section:hover {
+  border-color: var(--primary);
+  transform: translateY(-3px);
+}
+
+/* BUTTON */
+.upload-btn {
+  display: inline-flex;
+  background: linear-gradient(144deg, var(--accent), var(--primary), var(--secondary));
+  padding: 4px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.upload-btn span {
+  background: #05062d;
+  color: white;
+  padding: 16px 30px;
+  border-radius: 10px;
+}
+
+.upload-btn:hover span {
+  background: transparent;
+}
+
+/* RESULTS */
+.results {
+  display: none;
+  max-width: 700px;
+  margin: 40px auto;
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+}
+
+.top-result {
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--primary);
+}
+
+.confidence {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.prediction {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.bar {
+  height: 6px;
+  background: linear-gradient(90deg, var(--accent), var(--primary));
+  border-radius: 4px;
+}
+
+.results {
+  display: none;
+  max-width: 900px;
+  margin: 40px auto;
+  background: white;
+  padding: 30px;
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+
+  display: flex;
+  gap: 30px;
+}
+
+.result-left, .result-right {
+  flex: 1;
+  text-align: left;
+}
+
+.result-right {
+  background: #f7f7ff;
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 4px solid var(--accent);
+}
+
+.top-result {
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.confidence {
+  color: #666;
+  margin-top: 10px;
+}
+
+/* PREVIEW */
+#preview img {
+  margin-top: 20px;
+  border-radius: 12px;
+}
+</style>
+</head>
+
+<body>
+
+<nav>
+  <div class="logo">ShalomMed</div>
+  <div style="color:#666;">Isha Mehra</div>
+</nav>
+
+<section class="intro">
+  <h1>Diagnose Student State</h1>
+  <p>Please upload a clear picture of the area of concern for our robot friend to observe</p>
+
+  <div class="upload-section">
+    <button class="upload-btn" onclick="document.getElementById('imageUpload').click()">
+      <span>Upload Image</span>
+    </button>
+    <input type="file" id="imageUpload" hidden accept="image/*">
+  </div>
+</section>
+
+<div id="preview"></div>
+
+<div id="results" class="results" style="display:none;">
+
+  <div class="result-left">
+    <h2>Potential Diagnosis</h2>
+    <div id="topResult"></div>
+  </div>
+
+  <div class="result-right">
+    <div id="nextSteps"></div>
+  </div>
+
+</div>
+
+<script>
+const MODEL_URL = "/static/my_model/";
+
+let model;
+let isModelReady = false;
+
+const adviceMap = {
+  "Ringworm": `
+    This may be a fungal infection.
+    <ul>
+      <li>Use antifungal cream (like clotrimazole)</li>
+      <li>Keep the area clean and dry</li>
+      <li>Avoid sharing towels or clothing</li>
+      <li>See a doctor if it spreads</li>
+    </ul>
+  `,
+
+  "Not Infected": `
+    Skin appears normal.
+    <ul>
+      <li>No treatment needed</li>
+      <li>Maintain good hygiene</li>
+      <li>Monitor for changes</li>
+    </ul>
+  `,
+
+  "Keratosis Pilaris": `
+    Likely Keratosis Pilaris (harmless condition).
+    <ul>
+      <li>Use moisturizing lotions regularly</li>
+      <li>Try products with lactic acid or urea</li>
+      <li>Avoid harsh soaps</li>
+    </ul>
+  `
+};
+// LOAD MODEL
+async function init() {
+  model = await tmImage.load(
+    MODEL_URL + "model.json",
+    MODEL_URL + "metadata.json"
+  );
+  isModelReady = true;
+}
+
+init();
+
+// Uploading an imae
+document.getElementById("imageUpload").addEventListener("change", function(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.src = window.URL.createObjectURL(file);
+  img.width = 200;
+
+  document.getElementById("preview").innerHTML = "";
+  document.getElementById("preview").appendChild(img);
+
+  img.onload = () => predict(img);
+});
+
+// PREDICT
+async function predict(image) {
+  if (!isModelReady) return;
+
+  const predictions = await model.predict(image);
+  predictions.sort((a, b) => b.probability - a.probability);
+
+  const top = predictions[0];
+
+  if (top.probability < 0.6) {
+    document.getElementById("topResult").innerHTML = `
+      <div class="top-result">Unclear Result</div>
+      <div class="confidence">Please upload a clearer image</div>
+    `;
+    document.getElementById("nextSteps").innerHTML = `
+      Try better lighting or closer focus.
+    `;
+    document.getElementById("results").style.display = "flex";
+    return;
+  }
+
+  // Diagnosis label color
+  let color = "#5B42F3"; // default
+  if (top.className === "Ringworm") color = "#ff4d4d";
+  if (top.className === "Not Infected") color = "#00c853";
+  if (top.className === "Keratosis Pilaris") color = "#ff9800";
+
+  // Result/Potential Diagnosis 
+  document.getElementById("topResult").innerHTML = `
+    <div class="top-result" style="color:${color}">
+      ${top.className}
+    </div>
+    <div class="confidence">
+      ${(top.probability * 100).toFixed(1)}% confidence
+    </div>
+  `;
+
+  // What the student can do next
+  document.getElementById("nextSteps").innerHTML = `
+    <h3>What to do</h3>
+    ${adviceMap[top.className] || "to be updated..."}
+  `;
+
+  document.getElementById("results").style.display = "flex";
+}
+
+
+</script>
+
+<p style="font-size:12px; color:#888; margin-top:20px;">
+  This project is for informational purposes only and is not a medical diagnosis.
+</p>
+
+</body>
+</html>
