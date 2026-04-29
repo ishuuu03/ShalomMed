@@ -7,6 +7,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
 
 <style>
 :root {
@@ -16,15 +17,13 @@
   --bg: #f8f9ff;
 }
 
-/* GLOBAL */
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Poppins', sans-serif;
   background: var(--bg);
   text-align: center;
 }
 
-/* NAV */
 nav {
   display: flex;
   justify-content: space-between;
@@ -41,7 +40,6 @@ nav {
   -webkit-text-fill-color: transparent;
 }
 
-/* HERO */
 .intro {
   padding: 80px 20px 40px;
 }
@@ -54,7 +52,6 @@ nav {
   color: #666;
 }
 
-/* UPLOAD BOX */
 .upload-section {
   background: white;
   max-width: 600px;
@@ -70,7 +67,7 @@ nav {
   transform: translateY(-3px);
 }
 
-/* BUTTON */
+/* This is for the uplaod button */
 .upload-btn {
   display: inline-flex;
   background: linear-gradient(144deg, var(--accent), var(--primary), var(--secondary));
@@ -90,7 +87,7 @@ nav {
   background: transparent;
 }
 
-/* RESULTS */
+/* How the diagnosis appears */
 .results {
   display: none;
   max-width: 700px;
@@ -160,7 +157,32 @@ nav {
   margin-top: 10px;
 }
 
-/* PREVIEW */
+/* A bunch of the facts at the bottom*/
+.fun-facts {
+  max-width: 800px;
+  margin: 20px auto 60px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  padding: 0 20px;
+}
+
+.fact-card {
+  background: rgba(91, 66, 243, 0.05);
+  border: 1px solid rgba(91, 66, 243, 0.1);
+  padding: 15px;
+  border-radius: 16px;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.fact-card b {
+  color: var(--primary);
+  display: block;
+  font-size: 1.1rem;
+}
+
 #preview img {
   margin-top: 20px;
   border-radius: 12px;
@@ -187,7 +209,10 @@ nav {
   </div>
 </section>
 
-<div id="preview"></div>
+
+ <div id="preview"></div>
+
+<div id="preview"></div> 
 
 <div id="results" class="results" style="display:none;">
 
@@ -202,6 +227,22 @@ nav {
 
 </div>
 
+<div class="fun-facts">
+
+  <div class="fact-card">
+    <b>1.6 million</b>
+    An estimated 1.6 million students still lacked healthcare coverage  </div>
+
+  <div class="fact-card">
+    <b>Time</b>
+    The time required to schedule a physician appointment in 15 major metropolitan areas has increased by 19% since 2022 and by 48% since 2004  </div>
+
+  <div class="fact-card">
+    <b>Student Life</b>
+     College students are busy people! Do we wait 3 hours for a doctor's appointment just to be told to get medicine at an aisle in CVS? </div>
+
+</div>
+
 <script>
 const MODEL_URL = "/static/my_model/";
 
@@ -209,13 +250,15 @@ let model;
 let isModelReady = false;
 
 const adviceMap = {
-  "Ringworm": `
-    This may be a fungal infection.
+  "Ring Worm": `
+    This is likely a fungal infection which means an antifungal cream(like clotrimazole) is needed.
     <ul>
-      <li>Use antifungal cream (like clotrimazole)</li>
       <li>Keep the area clean and dry</li>
       <li>Avoid sharing towels or clothing</li>
       <li>See a doctor if it spreads</li>
+      <br>
+      <a href="https://www.amazon.com/s?k=ring+worm+medication&crid=1ZQFJEKV8CH7E&sprefix=ring+worm+medication%2Caps%2C128&ref=nb_sb_noss_2">Creams on Amazon</a>
+
     </ul>
   `,
 
@@ -227,6 +270,22 @@ const adviceMap = {
       <li>Monitor for changes</li>
     </ul>
   `,
+  "Athlete's Foot": `
+    This is a contagious fungal infection, so a medicated treatment is needed such as a cream.
+    <ul>
+      <li>Keep feet clean and dry</li>
+      <li>Avoid being barefoot in shared spaces</li>
+      <li>Monitor for changes</li>
+      <li>If the infection does not go away after self-treatment or gets worse, a healthcare provider may be needed.</li>
+     <br>
+      <a href="https://www.amazon.com/s?k=athlete%27s+foot+cream&crid=1FBNSYVHBLSFY&sprefix=athlete%27s+foot+cream%2Caps%2C127&ref=nb_sb_noss_1">Creams on Amazon</a>
+
+    </ul>
+  `,
+  "Not Clear": `
+    You need to upload a clear picture, friend!
+  `
+  ,
 
   "Keratosis Pilaris": `
     Likely Keratosis Pilaris (harmless condition).
@@ -235,9 +294,13 @@ const adviceMap = {
       <li>Try products with lactic acid or urea</li>
       <li>Avoid harsh soaps</li>
     </ul>
+  `,
+  "Not Skin": `
+    I don't identify any skin. Please upload another picture. 
   `
 };
-// LOAD MODEL
+
+// Loading my google teachable model
 async function init() {
   model = await tmImage.load(
     MODEL_URL + "model.json",
@@ -263,7 +326,7 @@ document.getElementById("imageUpload").addEventListener("change", function(event
   img.onload = () => predict(img);
 });
 
-// PREDICT
+// the actual predict part
 async function predict(image) {
   if (!isModelReady) return;
 
@@ -300,10 +363,10 @@ async function predict(image) {
     </div>
   `;
 
-  // What the student can do next
+  // What the student can do next (possible links for medication?/)
   document.getElementById("nextSteps").innerHTML = `
     <h3>What to do</h3>
-    ${adviceMap[top.className] || "to be updated..."}
+    ${adviceMap[top.className] || "To Be Updated"}
   `;
 
   document.getElementById("results").style.display = "flex";
